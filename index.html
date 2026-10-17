@@ -10,19 +10,22 @@
 :root[data-theme="dark"]{--bg:#1c1413;--fg:#f3e4e2;--head:#5a2f2c;--row:#3a2321;--acc:#ff8a80;--line:#6b403c;--btn:#ff8a80;--btnfg:#2a0a08;color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--fg);font:15px/1.4 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;padding:12px}
+body{background:var(--bg);background-image:linear-gradient(160deg,var(--bg),var(--bg2,var(--bg)));background-attachment:fixed;color:var(--fg);font:15px/1.4 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;padding:12px}
 .bar{display:flex;gap:8px;margin-bottom:8px}
-button{font:inherit;background:var(--btn);color:var(--btnfg);border:0;border-radius:8px;padding:9px 14px;cursor:pointer}
+button{font:inherit;background:linear-gradient(135deg,var(--btn),var(--btn2,var(--btn)));color:var(--btnfg);border:0;border-radius:8px;padding:9px 14px;cursor:pointer}
 button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.bar button{background:var(--head);color:var(--fg);border:1px solid var(--line);font-weight:600;transition:background .15s,color .15s,border-color .15s}
+.bar button:active{background:linear-gradient(135deg,var(--btn),var(--btn2,var(--btn)));color:var(--btnfg);border-color:var(--btn)}
+@media (hover:hover){.bar button:hover{background:linear-gradient(135deg,var(--btn),var(--btn2,var(--btn)));color:var(--btnfg);border-color:var(--btn)}}
 button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .hint{font-size:12px;opacity:.75;margin:0 0 10px}
-.wrap{overflow-x:auto;max-width:100%;border:1px solid var(--line);border-radius:8px}
+.wrap{overflow-x:auto;max-width:100%;border:1px solid var(--line);border-radius:8px;background:linear-gradient(90deg,var(--g1,var(--head)),var(--g2,var(--head)))}
 table{border-collapse:collapse;min-width:100%}
 th,td{border:1px solid var(--line);padding:8px;text-align:center;min-width:92px}
-th{background:var(--head);cursor:pointer;font-weight:600}
+th{background:transparent;cursor:pointer;font-weight:600}
 th small{display:block;font-weight:400;font-size:11px;opacity:.8}
 td{background:var(--row)}
-.m{position:sticky;left:0;min-width:170px;text-align:left;background:var(--head);z-index:1}
+.m{position:sticky;left:0;min-width:170px;text-align:left;background:var(--g1,var(--head));z-index:1}
 td.m{background:var(--row)}
 td.m{display:table-cell}
 .mc{display:flex;align-items:center;justify-content:space-between;gap:6px;word-break:break-all}
@@ -33,6 +36,10 @@ dialog input[type=text],dialog input[type=time],dialog textarea{width:100%;font:
 dialog label{font-size:13px}
 .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 .empty{padding:24px;text-align:center;opacity:.8}
+.tl{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.chip{display:inline-flex;align-items:center;background:var(--row);border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px}
+.addt{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
+dialog .addt input[type=time]{flex:1;margin:0;width:auto}
 .pal{display:flex;gap:12px;margin:0 0 10px;align-items:center}
 .pal button{width:28px;height:28px;border-radius:50%;padding:0;border:0}
 .pal button[aria-pressed="true"]{outline:2px solid var(--fg);outline-offset:2px}
@@ -49,15 +56,16 @@ const Z=7*3600e3, p=n=>String(n).padStart(2,'0');
 let S=null;
 try{S=JSON.parse(localStorage.getItem('cat_data'))}catch(e){}
 if(!S||!S.apps)S={apps:[],mails:[],checks:{}};
+S.apps.forEach(a=>{if(!a.times)a.times=[p(a.h)+':'+p(a.m)]});
 function save(){try{localStorage.setItem('cat_data',JSON.stringify(S))}catch(e){}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 // Mốc reset gần nhất đã qua (epoch ms), tính theo giờ VN
 function due(h,m){const n=Date.now()+Z,d=new Date(n);let t=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),h,m);if(t>n)t-=864e5;return t-Z}
-function reset(){let c=false;S.apps.forEach(a=>{const t=due(a.h,a.m);if(a.last<t){S.mails.forEach(x=>delete S.checks[x+'||'+a.name]);a.last=t;c=true}});if(c){save();render()}}
+function reset(){let c=false;S.apps.forEach(a=>{const t=Math.max(...a.times.map(x=>{const [h,m]=x.split(':').map(Number);return due(h,m)}));if(a.last<t){S.mails.forEach(x=>delete S.checks[x+'||'+a.name]);a.last=t;c=true}});if(c){save();render()}}
 function render(){
   const t=document.getElementById('t');
   if(!S.apps.length&&!S.mails.length){t.innerHTML='<tr><td class="empty">Bắt đầu bằng cách thêm một app, sau đó thêm mail.</td></tr>';return}
-  let h='<tr><th class="m" style="cursor:default">Mail</th>'+S.apps.map((a,i)=>`<th data-app="${i}">${esc(a.name)}<small>↻ ${p(a.h)}:${p(a.m)}</small></th>`).join('')+'</tr>';
+  let h='<tr><th class="m" style="cursor:default">Mail</th>'+S.apps.map((a,i)=>`<th data-app="${i}">${esc(a.name)}<small>↻ ${a.times.join(', ')}</small></th>`).join('')+'</tr>';
   h+=S.mails.map((m,j)=>`<tr><td class="m"><div class="mc"><span>${esc(m)}</span><button class="x" data-mail="${j}" aria-label="Xoá mail">✕</button></div></td>`+S.apps.map((a,i)=>`<td><input type="checkbox" data-c="${j}|${i}" ${S.checks[m+'||'+a.name]?'checked':''}></td>`).join('')+'</tr>').join('');
   t.innerHTML=h;
 }
@@ -70,16 +78,17 @@ function mailDlg(){
 }
 function appDlg(i){
   const o=i>=0?S.apps[i]:null;
-  dlg.innerHTML=`<label>Tên app</label><input type="text" id="n" value="${o?esc(o.name):''}"><label>Giờ reset (giờ VN)</label><input type="time" id="tm" value="${o?p(o.h)+':'+p(o.m):'00:00'}"><div class="acts">${o?'<button class="ghost" id="del">Xoá app</button>':''}<button class="ghost" id="no">Huỷ</button><button id="ok">Lưu</button></div>`;
+  dlg.innerHTML=`<label>Tên app</label><input type="text" id="n" value="${o?esc(o.name):''}"><label>Giờ reset mỗi ngày (giờ VN)</label><div id="tl" class="tl"></div><div class="addt"><input type="time" id="tm" value="12:00"><button class="ghost" id="at">+ Thêm giờ</button></div><div class="acts">${o?'<button class="ghost" id="del">Xoá app</button>':''}<button class="ghost" id="no">Huỷ</button><button id="ok">Lưu</button></div>`;
   dlg.showModal();
   no.onclick=()=>dlg.close();
+  let T=o?[...o.times]:['00:00'];const tl=document.getElementById('tl');const drawT=()=>{tl.innerHTML=T.map((x,k)=>`<span class="chip">${x}<button class="x" data-r="${k}" aria-label="Xoá giờ">✕</button></span>`).join('')||'<small>Chưa có giờ nào</small>'};drawT();tl.onclick=e=>{const b=e.target.closest('[data-r]');if(b){T.splice(+b.dataset.r,1);drawT()}};document.getElementById('at').onclick=()=>{const v=document.getElementById('tm').value;if(v&&!T.includes(v)){T.push(v);T.sort();drawT()}};
   if(o)del.onclick=()=>{if(!confirm('Xoá app "'+o.name+'"?'))return;S.mails.forEach(m=>delete S.checks[m+'||'+o.name]);S.apps.splice(i,1);save();render();dlg.close()};
   ok.onclick=()=>{
-    const n=document.getElementById('n').value.trim(),tv=document.getElementById('tm').value||'00:00';
+    const n=document.getElementById('n').value.trim();
     if(!n||S.apps.some((a,k)=>a.name===n&&k!==i))return;
-    const [h,m]=tv.split(':').map(Number);
-    if(o){S.mails.forEach(x=>{const k=x+'||'+o.name;if(S.checks[k]){S.checks[x+'||'+n]=true;delete S.checks[k]}});o.name=n;o.h=h;o.m=m;o.last=Date.now()}
-    else S.apps.push({name:n,h,m,last:Date.now()});
+    if(!T.length)return;
+    if(o){S.mails.forEach(x=>{const k=x+'||'+o.name;if(S.checks[k]){S.checks[x+'||'+n]=true;delete S.checks[k]}});o.name=n;o.times=[...T];o.last=Date.now()}
+    else S.apps.push({name:n,times:[...T],last:Date.now()});
     save();render();dlg.close();
   };
 }
@@ -100,10 +109,10 @@ const PAL={pink:{n:'Hồng',h:338,s:75,a:48},red:{n:'Đỏ',h:0,s:80},blue:{n:'X
 let pk='pink';try{const v=localStorage.getItem('cat_pal');if(PAL[v])pk=v}catch(e){}
 const mq=matchMedia('(prefers-color-scheme: dark)');
 function applyPal(){
-  const {h,s,a=33}=PAL[pk],d=mq.matches,st=document.documentElement.style,set=(k,v)=>st.setProperty(k,v);
-  if(d){set('--head',`hsl(${h},${s*.45}%,25%)`);set('--row',`hsl(${h},${s*.4}%,19%)`);set('--bg',`hsl(${h},25%,10%)`);set('--acc',`hsl(${h},100%,76%)`);set('--line',`hsl(${h},${s*.35}%,32%)`);set('--btn',`hsl(${h},100%,76%)`);set('--btnfg',`hsl(${h},60%,10%)`);set('--fg',`hsl(${h},30%,92%)`)}
-  else{set('--head',`hsl(${h},${s}%,83%)`);set('--row',`hsl(${h},${s}%,92%)`);set('--bg',`hsl(${h},60%,98%)`);set('--acc',`hsl(${h},85%,${a}%)`);set('--line',`hsl(${h},${s*.6}%,78%)`);set('--btn',`hsl(${h},85%,${a}%)`);set('--btnfg','#fff');set('--fg',`hsl(${h},30%,12%)`)}
-  document.getElementById('pal').innerHTML=Object.entries(PAL).map(([k,v])=>`<button data-p="${k}" title="${v.n}" aria-label="${v.n}" aria-pressed="${k===pk}" style="background:hsl(${v.h},${Math.max(v.s,60)}%,45%)"></button>`).join('');
+  const {h,s,a=33}=PAL[pk],h2=h+35,d=mq.matches,st=document.documentElement.style,set=(k,v)=>st.setProperty(k,v);
+  if(d){set('--head',`hsl(${h},${s*.45}%,25%)`);set('--row',`hsl(${h},${s*.4}%,19%)`);set('--bg',`hsl(${h},25%,10%)`);set('--acc',`hsl(${h},100%,76%)`);set('--line',`hsl(${h},${s*.35}%,32%)`);set('--btn',`hsl(${h},100%,76%)`);set('--btnfg',`hsl(${h},60%,10%)`);set('--fg',`hsl(${h},30%,92%)`);set('--g1',`hsl(${h},${s*.45}%,25%)`);set('--g2',`hsl(${h2},${s*.45}%,22%)`);set('--bg2',`hsl(${h2},25%,14%)`);set('--btn2',`hsl(${h2},100%,76%)`)}
+  else{set('--head',`hsl(${h},${s}%,83%)`);set('--row',`hsl(${h},${s}%,92%)`);set('--bg',`hsl(${h},60%,98%)`);set('--acc',`hsl(${h},85%,${a}%)`);set('--line',`hsl(${h},${s*.6}%,78%)`);set('--btn',`hsl(${h},85%,${a}%)`);set('--btnfg','#fff');set('--fg',`hsl(${h},30%,12%)`);set('--g1',`hsl(${h},${s}%,83%)`);set('--g2',`hsl(${h2},${s}%,80%)`);set('--bg2',`hsl(${h2},60%,94%)`);set('--btn2',`hsl(${h2},85%,${a}%)`)}
+  document.getElementById('pal').innerHTML=Object.entries(PAL).map(([k,v])=>`<button data-p="${k}" title="${v.n}" aria-label="${v.n}" aria-pressed="${k===pk}" style="background:linear-gradient(135deg,hsl(${v.h},${Math.max(v.s,60)}%,45%),hsl(${v.h+35},${Math.max(v.s,60)}%,55%))"></button>`).join('');
 }
 document.getElementById('pal').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(!b)return;pk=b.dataset.p;try{localStorage.setItem('cat_pal',pk)}catch(x){}applyPal()});
 mq.addEventListener('change',applyPal);

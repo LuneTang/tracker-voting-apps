@@ -23,6 +23,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-of
 table{border-collapse:collapse;min-width:100%}
 th,td{border:1px solid var(--line);padding:8px;text-align:center;min-width:92px}
 th{background:transparent;cursor:pointer;font-weight:600}
+th[data-app]{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+th.drag{position:relative;z-index:5;opacity:.85;cursor:grabbing;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+th.over{outline:2px dashed var(--acc);outline-offset:-3px}
 th small{display:block;font-weight:400;font-size:11px;opacity:.8}
 td{background:var(--row)}
 .m{position:sticky;left:0;min-width:170px;text-align:left;background:var(--g1,var(--head));z-index:1}
@@ -48,7 +51,7 @@ dialog .addt input[type=time]{flex:1;margin:0;width:auto}
 <body>
 <div class="bar"><button id="addMail">+ Mail</button><button id="addApp">+ App</button></div>
 <div class="pal" id="pal" role="group" aria-label="Tone màu"></div>
-<p class="hint">Chạm tên app để sửa giờ reset hoặc xoá. Giờ reset tính theo giờ Việt Nam (GMT+7).</p>
+<p class="hint">Chạm tên app để sửa hoặc xoá, kéo tên app sang trái/phải để đổi vị trí cột. Giờ reset tính theo giờ Việt Nam (GMT+7).</p>
 <div class="wrap"><table id="t"></table></div>
 <dialog id="dlg"></dialog>
 <script>
@@ -81,7 +84,7 @@ function appDlg(i){
   dlg.innerHTML=`<label>Tên app</label><input type="text" id="n" value="${o?esc(o.name):''}"><label>Giờ reset mỗi ngày (giờ VN)</label><div id="tl" class="tl"></div><div class="addt"><input type="time" id="tm" value="12:00"><button class="ghost" id="at">+ Thêm giờ</button></div><div class="acts">${o?'<button class="ghost" id="del">Xoá app</button>':''}<button class="ghost" id="no">Huỷ</button><button id="ok">Lưu</button></div>`;
   dlg.showModal();
   no.onclick=()=>dlg.close();
-  let T=o?[...o.times]:['00:00'];const tl=document.getElementById('tl');const drawT=()=>{tl.innerHTML=T.map((x,k)=>`<span class="chip">${x}<button class="x" data-r="${k}" aria-label="Xoá giờ">✕</button></span>`).join('')||'<small>Chưa có giờ nào</small>'};drawT();tl.onclick=e=>{const b=e.target.closest('[data-r]');if(b){T.splice(+b.dataset.r,1);drawT()}};document.getElementById('at').onclick=()=>{const v=document.getElementById('tm').value;if(v&&!T.includes(v)){T.push(v);T.sort();drawT()}};
+  let T=o?[...o.times]:['00:00'];const tl=document.getElementById('tl');const drawT=()=>{tl.innerHTML=T.map((x,k)=>`<span class="chip">${x}<button class="x" data-r="${k}" aria-label="Xoá giờ">🗑</button></span>`).join('')||'<small>Chưa có giờ nào</small>'};drawT();tl.onclick=e=>{const b=e.target.closest('[data-r]');if(b){T.splice(+b.dataset.r,1);drawT()}};document.getElementById('at').onclick=()=>{const v=document.getElementById('tm').value;if(v&&!T.includes(v)){T.push(v);T.sort();drawT()}};
   if(o)del.onclick=()=>{if(!confirm('Xoá app "'+o.name+'"?'))return;S.mails.forEach(m=>delete S.checks[m+'||'+o.name]);S.apps.splice(i,1);save();render();dlg.close()};
   ok.onclick=()=>{
     const n=document.getElementById('n').value.trim();
@@ -95,7 +98,7 @@ function appDlg(i){
 document.getElementById('addMail').onclick=mailDlg;
 document.getElementById('addApp').onclick=()=>appDlg(-1);
 document.getElementById('t').addEventListener('click',e=>{
-  const th=e.target.closest('[data-app]');if(th)return appDlg(+th.dataset.app);
+  const th=e.target.closest('[data-app]');if(th){if(dragged)return;return appDlg(+th.dataset.app)}
   const x=e.target.closest('[data-mail]');
   if(x){const j=+x.dataset.mail,m=S.mails[j];if(confirm('Xoá mail "'+m+'"?')){S.apps.forEach(a=>delete S.checks[m+'||'+a.name]);S.mails.splice(j,1);save();render()}}
 });
@@ -116,6 +119,26 @@ function applyPal(){
 }
 document.getElementById('pal').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(!b)return;pk=b.dataset.p;try{localStorage.setItem('cat_pal',pk)}catch(x){}applyPal()});
 mq.addEventListener('change',applyPal);
+let dragged=false,dg=null;
+const tbl=document.getElementById('t');
+tbl.addEventListener('pointerdown',e=>{const th=e.target.closest('th[data-app]');if(!th||e.button>0)return;dg={i:+th.dataset.app,to:+th.dataset.app,x:e.clientX,on:false,th,id:e.pointerId}});
+window.addEventListener('pointermove',e=>{
+  if(!dg||e.pointerId!==dg.id)return;
+  if(!dg.on){if(Math.abs(e.clientX-dg.x)<8)return;dg.on=true;dg.th.classList.add('drag')}
+  dg.th.style.transform='translateX('+(e.clientX-dg.x)+'px)';
+  const ths=[...tbl.querySelectorAll('th[data-app]')];dg.to=dg.i;
+  ths.forEach((t,k)=>{t.classList.remove('over');const r=t.getBoundingClientRect();if(k!==dg.i&&e.clientX>r.left&&e.clientX<r.right){dg.to=k;t.classList.add('over')}});
+  const f=ths[0].getBoundingClientRect(),l=ths[ths.length-1].getBoundingClientRect();
+  if(e.clientX<=f.left){dg.to=0;ths[0].classList.add('over')}else if(e.clientX>=l.right){dg.to=ths.length-1;ths[ths.length-1].classList.add('over')}
+});
+function endDrag(ok){
+  if(!dg)return;const g=dg;dg=null;
+  if(g.on){dragged=true;setTimeout(()=>{dragged=false},50);
+    if(ok&&g.to!==g.i){const [a]=S.apps.splice(g.i,1);S.apps.splice(g.to,0,a);save()}
+    render()}
+}
+window.addEventListener('pointerup',()=>endDrag(true));
+window.addEventListener('pointercancel',()=>endDrag(false));
 applyPal();
 render();reset();
 setInterval(reset,30000);

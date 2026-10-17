@@ -1,148 +1,866 @@
 <!doctype html>
 <html lang="vi">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Check App Tracker</title>
-<style>
-:root{--bg:#fffaf9;--fg:#2a1a19;--head:#f4c7c3;--row:#fbe3e1;--acc:#a30d0d;--line:#e3b3af;--btn:#a30d0d;--btnfg:#fff;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1413;--fg:#f3e4e2;--head:#5a2f2c;--row:#3a2321;--acc:#ff8a80;--line:#6b403c;--btn:#ff8a80;--btnfg:#2a0a08;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#1c1413;--fg:#f3e4e2;--head:#5a2f2c;--row:#3a2321;--acc:#ff8a80;--line:#6b403c;--btn:#ff8a80;--btnfg:#2a0a08;color-scheme:dark}
-*{box-sizing:border-box}
-html,body{margin:0}
-body{background:var(--bg);background-image:linear-gradient(160deg,var(--bg),var(--bg2,var(--bg)));background-attachment:fixed;color:var(--fg);font:15px/1.4 "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;padding:12px}
-.bar{display:flex;gap:8px;margin-bottom:8px}
-button{font:inherit;background:linear-gradient(135deg,var(--btn),var(--btn2,var(--btn)));color:var(--btnfg);border:0;border-radius:8px;padding:9px 14px;cursor:pointer}
-button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
-.bar button{background:var(--head);color:var(--fg);border:1px solid var(--line);font-weight:600;transition:background .15s,color .15s,border-color .15s}
-.bar button:active{background:linear-gradient(135deg,var(--btn),var(--btn2,var(--btn)));color:var(--btnfg);border-color:var(--btn)}
-@media (hover:hover){.bar button:hover{background:linear-gradient(135deg,var(--btn),var(--btn2,var(--btn)));color:var(--btnfg);border-color:var(--btn)}}
-button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.hint{font-size:12px;opacity:.75;margin:0 0 10px}
-.wrap{overflow-x:auto;max-width:100%;border:1px solid var(--line);border-radius:8px;background:linear-gradient(90deg,var(--g1,var(--head)),var(--g2,var(--head)))}
-table{border-collapse:collapse;min-width:100%}
-th,td{border:1px solid var(--line);padding:8px;text-align:center;min-width:92px}
-th{background:transparent;cursor:pointer;font-weight:600}
-th[data-app]{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
-th.drag{position:relative;z-index:5;opacity:.85;cursor:grabbing;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-th.over{outline:2px dashed var(--acc);outline-offset:-3px}
-th small{display:block;font-weight:400;font-size:11px;opacity:.8}
-td{background:var(--row)}
-.m{position:sticky;left:0;min-width:170px;text-align:left;background:var(--g1,var(--head));z-index:1}
-td.m{background:var(--row)}
-td.m{display:table-cell}
-.mc{display:flex;align-items:center;justify-content:space-between;gap:6px;word-break:break-all}
-.x{background:transparent;color:var(--fg);border:0;padding:2px 6px;opacity:.6}
-input[type=checkbox]{width:24px;height:24px;accent-color:var(--acc)}
-dialog{border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);width:min(92vw,360px)}
-dialog input[type=text],dialog input[type=time],dialog textarea{width:100%;font:inherit;padding:9px;margin:4px 0 12px;border:1px solid var(--line);border-radius:8px;background:var(--row);color:var(--fg)}
-dialog label{font-size:13px}
-.acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-.empty{padding:24px;text-align:center;opacity:.8}
-.tl{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
-.chip{display:inline-flex;align-items:center;background:var(--row);border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px}
-.addt{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
-dialog .addt input[type=time]{flex:1;margin:0;width:auto}
-.pal{display:flex;gap:12px;margin:0 0 10px;align-items:center}
-.pal button{width:28px;height:28px;border-radius:50%;padding:0;border:0}
-.pal button[aria-pressed="true"]{outline:2px solid var(--fg);outline-offset:2px}
-</style>
-</head>
-<body>
-<div class="bar"><button id="addMail">+ Mail</button><button id="addApp">+ App</button></div>
-<div class="pal" id="pal" role="group" aria-label="Tone màu"></div>
-<p class="hint">Chạm tên app để sửa hoặc xoá, kéo tên app sang trái/phải để đổi vị trí cột. Giờ reset tính theo giờ Việt Nam (GMT+7).</p>
-<div class="wrap"><table id="t"></table></div>
-<dialog id="dlg"></dialog>
-<script>
-const Z=7*3600e3, p=n=>String(n).padStart(2,'0');
-let S=null;
-try{S=JSON.parse(localStorage.getItem('cat_data'))}catch(e){}
-if(!S||!S.apps)S={apps:[],mails:[],checks:{}};
-S.apps.forEach(a=>{if(!a.times)a.times=[p(a.h)+':'+p(a.m)]});
-function save(){try{localStorage.setItem('cat_data',JSON.stringify(S))}catch(e){}}
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-// Mốc reset gần nhất đã qua (epoch ms), tính theo giờ VN
-function due(h,m){const n=Date.now()+Z,d=new Date(n);let t=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),h,m);if(t>n)t-=864e5;return t-Z}
-function reset(){let c=false;S.apps.forEach(a=>{const t=Math.max(...a.times.map(x=>{const [h,m]=x.split(':').map(Number);return due(h,m)}));if(a.last<t){S.mails.forEach(x=>delete S.checks[x+'||'+a.name]);a.last=t;c=true}});if(c){save();render()}}
-function render(){
-  const t=document.getElementById('t');
-  if(!S.apps.length&&!S.mails.length){t.innerHTML='<tr><td class="empty">Bắt đầu bằng cách thêm một app, sau đó thêm mail.</td></tr>';return}
-  let h='<tr><th class="m" style="cursor:default">Mail</th>'+S.apps.map((a,i)=>`<th data-app="${i}">${esc(a.name)}<small>↻ ${a.times.join(', ')}</small></th>`).join('')+'</tr>';
-  h+=S.mails.map((m,j)=>`<tr><td class="m"><div class="mc"><span>${esc(m)}</span><button class="x" data-mail="${j}" aria-label="Xoá mail">✕</button></div></td>`+S.apps.map((a,i)=>`<td><input type="checkbox" data-c="${j}|${i}" ${S.checks[m+'||'+a.name]?'checked':''}></td>`).join('')+'</tr>').join('');
-  t.innerHTML=h;
-}
-const dlg=document.getElementById('dlg');
-function mailDlg(){
-  dlg.innerHTML='<label>Email (mỗi dòng một mail, dán nhiều mail cùng lúc cũng được)</label><textarea id="v" rows="6"></textarea><div class="acts"><button class="ghost" id="no">Huỷ</button><button id="ok">Thêm mail</button></div>';
-  dlg.showModal();
-  no.onclick=()=>dlg.close();
-  ok.onclick=()=>{const list=document.getElementById('v').value.split(/[\n,;\s]+/).map(x=>x.trim()).filter(Boolean);list.forEach(v=>{if(!S.mails.includes(v))S.mails.push(v)});if(list.length){save();render()}dlg.close()};
-}
-function appDlg(i){
-  const o=i>=0?S.apps[i]:null;
-  dlg.innerHTML=`<label>Tên app</label><input type="text" id="n" value="${o?esc(o.name):''}"><label>Giờ reset mỗi ngày (giờ VN)</label><div id="tl" class="tl"></div><div class="addt"><input type="time" id="tm" value="12:00"><button class="ghost" id="at">+ Thêm giờ</button></div><div class="acts">${o?'<button class="ghost" id="del">Xoá app</button>':''}<button class="ghost" id="no">Huỷ</button><button id="ok">Lưu</button></div>`;
-  dlg.showModal();
-  no.onclick=()=>dlg.close();
-  let T=o?[...o.times]:['00:00'];const tl=document.getElementById('tl');const drawT=()=>{tl.innerHTML=T.map((x,k)=>`<span class="chip">${x}<button class="x" data-r="${k}" aria-label="Xoá giờ">🗑</button></span>`).join('')||'<small>Chưa có giờ nào</small>'};drawT();tl.onclick=e=>{const b=e.target.closest('[data-r]');if(b){T.splice(+b.dataset.r,1);drawT()}};document.getElementById('at').onclick=()=>{const v=document.getElementById('tm').value;if(v&&!T.includes(v)){T.push(v);T.sort();drawT()}};
-  if(o)del.onclick=()=>{if(!confirm('Xoá app "'+o.name+'"?'))return;S.mails.forEach(m=>delete S.checks[m+'||'+o.name]);S.apps.splice(i,1);save();render();dlg.close()};
-  ok.onclick=()=>{
-    const n=document.getElementById('n').value.trim();
-    if(!n||S.apps.some((a,k)=>a.name===n&&k!==i))return;
-    if(!T.length)return;
-    if(o){S.mails.forEach(x=>{const k=x+'||'+o.name;if(S.checks[k]){S.checks[x+'||'+n]=true;delete S.checks[k]}});o.name=n;o.times=[...T];o.last=Date.now()}
-    else S.apps.push({name:n,times:[...T],last:Date.now()});
-    save();render();dlg.close();
-  };
-}
-document.getElementById('addMail').onclick=mailDlg;
-document.getElementById('addApp').onclick=()=>appDlg(-1);
-document.getElementById('t').addEventListener('click',e=>{
-  const th=e.target.closest('[data-app]');if(th){if(dragged)return;return appDlg(+th.dataset.app)}
-  const x=e.target.closest('[data-mail]');
-  if(x){const j=+x.dataset.mail,m=S.mails[j];if(confirm('Xoá mail "'+m+'"?')){S.apps.forEach(a=>delete S.checks[m+'||'+a.name]);S.mails.splice(j,1);save();render()}}
-});
-document.getElementById('t').addEventListener('change',e=>{
-  const c=e.target.dataset.c;if(!c)return;
-  const [j,i]=c.split('|').map(Number),k=S.mails[j]+'||'+S.apps[i].name;
-  if(e.target.checked)S.checks[k]=true;else delete S.checks[k];
-  save();
-});
-const PAL={pink:{n:'Hồng',h:338,s:75,a:48},red:{n:'Đỏ',h:0,s:80},blue:{n:'Xanh dương',h:215,s:70},green:{n:'Xanh lá',h:140,s:45},purple:{n:'Tím',h:270,s:50},yellow:{n:'Vàng',h:45,s:85}};
-let pk='pink';try{const v=localStorage.getItem('cat_pal');if(PAL[v])pk=v}catch(e){}
-const mq=matchMedia('(prefers-color-scheme: dark)');
-function applyPal(){
-  const {h,s,a=33}=PAL[pk],h2=h+35,d=mq.matches,st=document.documentElement.style,set=(k,v)=>st.setProperty(k,v);
-  if(d){set('--head',`hsl(${h},${s*.45}%,25%)`);set('--row',`hsl(${h},${s*.4}%,19%)`);set('--bg',`hsl(${h},25%,10%)`);set('--acc',`hsl(${h},100%,76%)`);set('--line',`hsl(${h},${s*.35}%,32%)`);set('--btn',`hsl(${h},100%,76%)`);set('--btnfg',`hsl(${h},60%,10%)`);set('--fg',`hsl(${h},30%,92%)`);set('--g1',`hsl(${h},${s*.45}%,25%)`);set('--g2',`hsl(${h2},${s*.45}%,22%)`);set('--bg2',`hsl(${h2},25%,14%)`);set('--btn2',`hsl(${h2},100%,76%)`)}
-  else{set('--head',`hsl(${h},${s}%,83%)`);set('--row',`hsl(${h},${s}%,92%)`);set('--bg',`hsl(${h},60%,98%)`);set('--acc',`hsl(${h},85%,${a}%)`);set('--line',`hsl(${h},${s*.6}%,78%)`);set('--btn',`hsl(${h},85%,${a}%)`);set('--btnfg','#fff');set('--fg',`hsl(${h},30%,12%)`);set('--g1',`hsl(${h},${s}%,83%)`);set('--g2',`hsl(${h2},${s}%,80%)`);set('--bg2',`hsl(${h2},60%,94%)`);set('--btn2',`hsl(${h2},85%,${a}%)`)}
-  document.getElementById('pal').innerHTML=Object.entries(PAL).map(([k,v])=>`<button data-p="${k}" title="${v.n}" aria-label="${v.n}" aria-pressed="${k===pk}" style="background:linear-gradient(135deg,hsl(${v.h},${Math.max(v.s,60)}%,45%),hsl(${v.h+35},${Math.max(v.s,60)}%,55%))"></button>`).join('');
-}
-document.getElementById('pal').addEventListener('click',e=>{const b=e.target.closest('[data-p]');if(!b)return;pk=b.dataset.p;try{localStorage.setItem('cat_pal',pk)}catch(x){}applyPal()});
-mq.addEventListener('change',applyPal);
-let dragged=false,dg=null;
-const tbl=document.getElementById('t');
-tbl.addEventListener('pointerdown',e=>{const th=e.target.closest('th[data-app]');if(!th||e.button>0)return;dg={i:+th.dataset.app,to:+th.dataset.app,x:e.clientX,on:false,th,id:e.pointerId}});
-window.addEventListener('pointermove',e=>{
-  if(!dg||e.pointerId!==dg.id)return;
-  if(!dg.on){if(Math.abs(e.clientX-dg.x)<8)return;dg.on=true;dg.th.classList.add('drag')}
-  dg.th.style.transform='translateX('+(e.clientX-dg.x)+'px)';
-  const ths=[...tbl.querySelectorAll('th[data-app]')];dg.to=dg.i;
-  ths.forEach((t,k)=>{t.classList.remove('over');const r=t.getBoundingClientRect();if(k!==dg.i&&e.clientX>r.left&&e.clientX<r.right){dg.to=k;t.classList.add('over')}});
-  const f=ths[0].getBoundingClientRect(),l=ths[ths.length-1].getBoundingClientRect();
-  if(e.clientX<=f.left){dg.to=0;ths[0].classList.add('over')}else if(e.clientX>=l.right){dg.to=ths.length-1;ths[ths.length-1].classList.add('over')}
-});
-function endDrag(ok){
-  if(!dg)return;const g=dg;dg=null;
-  if(g.on){dragged=true;setTimeout(()=>{dragged=false},50);
-    if(ok&&g.to!==g.i){const [a]=S.apps.splice(g.i,1);S.apps.splice(g.to,0,a);save()}
-    render()}
-}
-window.addEventListener('pointerup',()=>endDrag(true));
-window.addEventListener('pointercancel',()=>endDrag(false));
-applyPal();
-render();reset();
-setInterval(reset,30000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)reset()});
-</script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Vote Tracker</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="apple-touch-icon" href="favicon.png" />
+    <style>
+      :root {
+        --bg: #fffaf9;
+        --fg: #2a1a19;
+        --head: #f4c7c3;
+        --row: #fbe3e1;
+        --acc: #a30d0d;
+        --line: #e3b3af;
+        --btn: #a30d0d;
+        --btnfg: #fff;
+        color-scheme: light;
+        box-sizing: border-box;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          --bg: #1c1413;
+          --fg: #f3e4e2;
+          --head: #5a2f2c;
+          --row: #3a2321;
+          --acc: #ff8a80;
+          --line: #6b403c;
+          --btn: #ff8a80;
+          --btnfg: #2a0a08;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme="dark"] {
+        --bg: #1c1413;
+        --fg: #f3e4e2;
+        --head: #5a2f2c;
+        --row: #3a2321;
+        --acc: #ff8a80;
+        --line: #6b403c;
+        --btn: #ff8a80;
+        --btnfg: #2a0a08;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        background-image: linear-gradient(
+          160deg,
+          var(--bg),
+          var(--bg2, var(--bg))
+        );
+        background-attachment: fixed;
+        color: var(--fg);
+        font:
+          15px/1.4 "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+        padding: 12px;
+      }
+      .bar {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      button {
+        font: inherit;
+        background: linear-gradient(
+          135deg,
+          var(--btn),
+          var(--btn2, var(--btn))
+        );
+        color: var(--btnfg);
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 14px;
+        cursor: pointer;
+      }
+      button.ghost {
+        background: transparent;
+        color: var(--fg);
+        border: 1px solid var(--line);
+      }
+      .bar button {
+        background: var(--head);
+        color: var(--fg);
+        border: 1px solid var(--line);
+        font-weight: 600;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          border-color 0.15s;
+      }
+      .bar button:active {
+        background: linear-gradient(
+          135deg,
+          var(--btn),
+          var(--btn2, var(--btn))
+        );
+        color: var(--btnfg);
+        border-color: var(--btn);
+      }
+      @media (hover: hover) {
+        .bar button:hover {
+          background: linear-gradient(
+            135deg,
+            var(--btn),
+            var(--btn2, var(--btn))
+          );
+          color: var(--btnfg);
+          border-color: var(--btn);
+        }
+      }
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--acc);
+        outline-offset: 2px;
+      }
+      .hint {
+        font-size: 12px;
+        opacity: 0.75;
+        margin: 0 0 10px;
+      }
+      .wrap {
+        overflow-x: auto;
+        max-width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: linear-gradient(
+          90deg,
+          var(--g1, var(--head)),
+          var(--g2, var(--head))
+        );
+      }
+      table {
+        border-collapse: collapse;
+        min-width: 100%;
+      }
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 8px;
+        text-align: center;
+        min-width: 92px;
+      }
+      th {
+        background: transparent;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      th[data-app] {
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        cursor: grab;
+      }
+      th.drag {
+        position: relative;
+        z-index: 5;
+        opacity: 0.85;
+        cursor: grabbing;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+      }
+      th.over {
+        outline: 2px dashed var(--acc);
+        outline-offset: -3px;
+      }
+      th small {
+        display: block;
+        font-weight: 400;
+        font-size: 11px;
+        opacity: 0.8;
+      }
+      td {
+        background: var(--row);
+      }
+      .m {
+        position: sticky;
+        left: 0;
+        min-width: 170px;
+        text-align: left;
+        background: var(--g1, var(--head));
+        z-index: 1;
+      }
+      td.m {
+        background: var(--row);
+      }
+      td.m {
+        display: table-cell;
+      }
+      .mc {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        word-break: break-all;
+      }
+      .x {
+        background: transparent;
+        color: var(--fg);
+        border: 0;
+        padding: 2px 6px;
+        opacity: 0.6;
+      }
+      input[type="checkbox"] {
+        width: 24px;
+        height: 24px;
+        accent-color: var(--acc);
+      }
+      dialog {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--bg);
+        color: var(--fg);
+        width: min(92vw, 360px);
+      }
+      dialog input[type="text"],
+      dialog input[type="time"],
+      dialog textarea {
+        width: 100%;
+        font: inherit;
+        padding: 9px;
+        margin: 4px 0 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--row);
+        color: var(--fg);
+      }
+      dialog label {
+        font-size: 13px;
+      }
+      .acts {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+      }
+      .empty {
+        padding: 24px;
+        text-align: center;
+        opacity: 0.8;
+      }
+      .tl {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 6px 0 10px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        background: var(--row);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 4px 2px 10px;
+      }
+      .addt {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        margin-bottom: 12px;
+      }
+      dialog .addt input[type="time"] {
+        flex: 1;
+        margin: 0;
+        width: auto;
+      }
+      .sync {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-size: 13px;
+        margin: 0 0 10px;
+      }
+      .sync[hidden] {
+        display: none;
+      }
+      .sync button {
+        padding: 5px 10px;
+        font-size: 13px;
+      }
+      .pal {
+        display: flex;
+        gap: 12px;
+        margin: 0 0 10px;
+        align-items: center;
+      }
+      .pal button {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        padding: 0;
+        border: 0;
+      }
+      .pal button[aria-pressed="true"] {
+        outline: 2px solid var(--fg);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <button id="addMail">+ Mail</button><button id="addApp">+ App</button>
+    </div>
+    <div class="sync" id="sync" hidden></div>
+    <div class="pal" id="pal" role="group" aria-label="Tone màu"></div>
+    <p class="hint">
+      Chạm tên app để sửa hoặc xoá, kéo tên app sang trái/phải để đổi vị trí
+      cột. Giờ reset tính theo giờ Việt Nam (GMT+7).
+    </p>
+    <div class="wrap"><table id="t"></table></div>
+    <dialog id="dlg"></dialog>
+    <script>
+      // ===== ĐỒNG BỘ FIREBASE: dán firebaseConfig vào đây (thay chữ null) =====
+      const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyCCCGWx1w7YZSCmsJ8UTAvNEKcVkenHxVE",
+        authDomain: "track-voting-apps.firebaseapp.com",
+        projectId: "track-voting-apps",
+        storageBucket: "track-voting-apps.firebasestorage.app",
+        messagingSenderId: "515590840331",
+        appId: "1:515590840331:web:6b4fcd4c97bcd619af270e",
+      };
+      // ==========================================================================
+      const Z = 7 * 3600e3,
+        p = (n) => String(n).padStart(2, "0");
+      let S = null;
+      try {
+        S = JSON.parse(localStorage.getItem("cat_data"));
+      } catch (e) {}
+      if (!S || !S.apps) S = { apps: [], mails: [], checks: {} };
+      S.apps.forEach((a) => {
+        if (!a.times) a.times = [p(a.h) + ":" + p(a.m)];
+      });
+      for (const k in S.checks)
+        if (S.checks[k] === true) S.checks[k] = Date.now();
+      function save() {
+        try {
+          localStorage.setItem("cat_data", JSON.stringify(S));
+        } catch (e) {}
+        push();
+      }
+      function esc(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      }
+      // Mốc reset gần nhất đã qua (epoch ms), tính theo giờ VN
+      function due(h, m) {
+        const n = Date.now() + Z,
+          d = new Date(n);
+        let t = Date.UTC(
+          d.getUTCFullYear(),
+          d.getUTCMonth(),
+          d.getUTCDate(),
+          h,
+          m,
+        );
+        if (t > n) t -= 864e5;
+        return t - Z;
+      }
+      function dueOf(a) {
+        return Math.max(
+          ...a.times.map((x) => {
+            const [h, m] = x.split(":").map(Number);
+            return due(h, m);
+          }),
+        );
+      }
+      function isOn(m, a) {
+        return (S.checks[m + "||" + a.name] || 0) >= dueOf(a);
+      }
+      let sig = "";
+      function reset() {
+        const s = S.apps.map(dueOf).join();
+        if (s !== sig) {
+          sig = s;
+          render();
+        }
+      }
+      function render() {
+        const t = document.getElementById("t");
+        if (!S.apps.length && !S.mails.length) {
+          t.innerHTML =
+            '<tr><td class="empty">Bắt đầu bằng cách thêm một app, sau đó thêm mail.</td></tr>';
+          return;
+        }
+        let h =
+          '<tr><th class="m" style="cursor:default">Mail</th>' +
+          S.apps
+            .map(
+              (a, i) =>
+                `<th data-app="${i}">${esc(a.name)}<small>↻ ${a.times.join(", ")}</small></th>`,
+            )
+            .join("") +
+          "</tr>";
+        h += S.mails
+          .map(
+            (m, j) =>
+              `<tr><td class="m"><div class="mc"><span>${esc(m)}</span><button class="x" data-mail="${j}" aria-label="Xoá mail">✕</button></div></td>` +
+              S.apps
+                .map(
+                  (a, i) =>
+                    `<td><input type="checkbox" data-c="${j}|${i}" ${isOn(m, a) ? "checked" : ""}></td>`,
+                )
+                .join("") +
+              "</tr>",
+          )
+          .join("");
+        t.innerHTML = h;
+      }
+      const dlg = document.getElementById("dlg");
+      function mailDlg() {
+        dlg.innerHTML =
+          '<label>Email (mỗi dòng một mail, dán nhiều mail cùng lúc cũng được)</label><textarea id="v" rows="6"></textarea><div class="acts"><button class="ghost" id="no">Huỷ</button><button id="ok">Thêm mail</button></div>';
+        dlg.showModal();
+        no.onclick = () => dlg.close();
+        ok.onclick = () => {
+          const list = document
+            .getElementById("v")
+            .value.split(/[\n,;\s]+/)
+            .map((x) => x.trim())
+            .filter(Boolean);
+          list.forEach((v) => {
+            if (!S.mails.includes(v)) S.mails.push(v);
+          });
+          if (list.length) {
+            save();
+            render();
+          }
+          dlg.close();
+        };
+      }
+      function appDlg(i) {
+        const o = i >= 0 ? S.apps[i] : null;
+        dlg.innerHTML = `<label>Tên app</label><input type="text" id="n" value="${o ? esc(o.name) : ""}"><label>Giờ reset mỗi ngày (giờ VN)</label><div id="tl" class="tl"></div><div class="addt"><input type="time" id="tm" value="12:00"><button class="ghost" id="at">+ Thêm giờ</button></div><div class="acts">${o ? '<button class="ghost" id="del">Xoá app</button>' : ""}<button class="ghost" id="no">Huỷ</button><button id="ok">Lưu</button></div>`;
+        dlg.showModal();
+        no.onclick = () => dlg.close();
+        let T = o ? [...o.times] : ["00:00"];
+        const tl = document.getElementById("tl");
+        const drawT = () => {
+          tl.innerHTML =
+            T.map(
+              (x, k) =>
+                `<span class="chip">${x}<button class="x" data-r="${k}" aria-label="Xoá giờ">✕</button></span>`,
+            ).join("") || "<small>Chưa có giờ nào</small>";
+        };
+        drawT();
+        tl.onclick = (e) => {
+          const b = e.target.closest("[data-r]");
+          if (b) {
+            T.splice(+b.dataset.r, 1);
+            drawT();
+          }
+        };
+        document.getElementById("at").onclick = () => {
+          const v = document.getElementById("tm").value;
+          if (v && !T.includes(v)) {
+            T.push(v);
+            T.sort();
+            drawT();
+          }
+        };
+        if (o)
+          del.onclick = () => {
+            if (!confirm('Xoá app "' + o.name + '"?')) return;
+            S.mails.forEach((m) => delete S.checks[m + "||" + o.name]);
+            S.apps.splice(i, 1);
+            save();
+            render();
+            dlg.close();
+          };
+        ok.onclick = () => {
+          const n = document.getElementById("n").value.trim();
+          if (!n || S.apps.some((a, k) => a.name === n && k !== i)) return;
+          if (!T.length) return;
+          if (o) {
+            S.mails.forEach((x) => {
+              const k = x + "||" + o.name;
+              if (S.checks[k]) {
+                S.checks[x + "||" + n] = S.checks[k];
+                delete S.checks[k];
+              }
+            });
+            o.name = n;
+            o.times = [...T];
+            o.last = Date.now();
+          } else S.apps.push({ name: n, times: [...T], last: Date.now() });
+          save();
+          render();
+          dlg.close();
+        };
+      }
+      document.getElementById("addMail").onclick = mailDlg;
+      document.getElementById("addApp").onclick = () => appDlg(-1);
+      document.getElementById("t").addEventListener("click", (e) => {
+        const th = e.target.closest("[data-app]");
+        if (th) {
+          if (dragged) return;
+          return appDlg(+th.dataset.app);
+        }
+        const x = e.target.closest("[data-mail]");
+        if (x) {
+          const j = +x.dataset.mail,
+            m = S.mails[j];
+          if (confirm('Xoá mail "' + m + '"?')) {
+            S.apps.forEach((a) => delete S.checks[m + "||" + a.name]);
+            S.mails.splice(j, 1);
+            save();
+            render();
+          }
+        }
+      });
+      document.getElementById("t").addEventListener("change", (e) => {
+        const c = e.target.dataset.c;
+        if (!c) return;
+        const [j, i] = c.split("|").map(Number),
+          k = S.mails[j] + "||" + S.apps[i].name;
+        if (e.target.checked) S.checks[k] = Date.now();
+        else delete S.checks[k];
+        save();
+      });
+      const PAL = {
+        pink: { n: "Hồng", h: 338, s: 75, a: 48 },
+        red: { n: "Đỏ", h: 0, s: 80 },
+        blue: { n: "Xanh dương", h: 215, s: 70 },
+        green: { n: "Xanh lá", h: 140, s: 45 },
+        purple: { n: "Tím", h: 270, s: 50 },
+        yellow: { n: "Vàng", h: 45, s: 85 },
+      };
+      let pk = "pink";
+      try {
+        const v = localStorage.getItem("cat_pal");
+        if (PAL[v]) pk = v;
+      } catch (e) {}
+      const mq = matchMedia("(prefers-color-scheme: dark)");
+      function applyPal() {
+        const { h, s, a = 33 } = PAL[pk],
+          h2 = h + 35,
+          d = mq.matches,
+          st = document.documentElement.style,
+          set = (k, v) => st.setProperty(k, v);
+        if (d) {
+          set("--head", `hsl(${h},${s * 0.45}%,25%)`);
+          set("--row", `hsl(${h},${s * 0.4}%,19%)`);
+          set("--bg", `hsl(${h},25%,10%)`);
+          set("--acc", `hsl(${h},100%,76%)`);
+          set("--line", `hsl(${h},${s * 0.35}%,32%)`);
+          set("--btn", `hsl(${h},100%,76%)`);
+          set("--btnfg", `hsl(${h},60%,10%)`);
+          set("--fg", `hsl(${h},30%,92%)`);
+          set("--g1", `hsl(${h},${s * 0.45}%,25%)`);
+          set("--g2", `hsl(${h2},${s * 0.45}%,22%)`);
+          set("--bg2", `hsl(${h2},25%,14%)`);
+          set("--btn2", `hsl(${h2},100%,76%)`);
+        } else {
+          set("--head", `hsl(${h},${s}%,83%)`);
+          set("--row", `hsl(${h},${s}%,92%)`);
+          set("--bg", `hsl(${h},60%,98%)`);
+          set("--acc", `hsl(${h},85%,${a}%)`);
+          set("--line", `hsl(${h},${s * 0.6}%,78%)`);
+          set("--btn", `hsl(${h},85%,${a}%)`);
+          set("--btnfg", "#fff");
+          set("--fg", `hsl(${h},30%,12%)`);
+          set("--g1", `hsl(${h},${s}%,83%)`);
+          set("--g2", `hsl(${h2},${s}%,80%)`);
+          set("--bg2", `hsl(${h2},60%,94%)`);
+          set("--btn2", `hsl(${h2},85%,${a}%)`);
+        }
+        document.getElementById("pal").innerHTML = Object.entries(PAL)
+          .map(
+            ([k, v]) =>
+              `<button data-p="${k}" title="${v.n}" aria-label="${v.n}" aria-pressed="${k === pk}" style="background:linear-gradient(135deg,hsl(${v.h},${Math.max(v.s, 60)}%,45%),hsl(${v.h + 35},${Math.max(v.s, 60)}%,55%))"></button>`,
+          )
+          .join("");
+      }
+      document.getElementById("pal").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-p]");
+        if (!b) return;
+        pk = b.dataset.p;
+        try {
+          localStorage.setItem("cat_pal", pk);
+        } catch (x) {}
+        applyPal();
+      });
+      mq.addEventListener("change", applyPal);
+      let dragged = false,
+        dg = null;
+      const tbl = document.getElementById("t");
+      tbl.addEventListener("pointerdown", (e) => {
+        const th = e.target.closest("th[data-app]");
+        if (!th || e.button > 0) return;
+        dg = {
+          i: +th.dataset.app,
+          to: +th.dataset.app,
+          x: e.clientX,
+          on: false,
+          th,
+          id: e.pointerId,
+        };
+      });
+      window.addEventListener("pointermove", (e) => {
+        if (!dg || e.pointerId !== dg.id) return;
+        if (!dg.on) {
+          if (Math.abs(e.clientX - dg.x) < 8) return;
+          dg.on = true;
+          dg.th.classList.add("drag");
+        }
+        dg.th.style.transform = "translateX(" + (e.clientX - dg.x) + "px)";
+        const ths = [...tbl.querySelectorAll("th[data-app]")];
+        dg.to = dg.i;
+        ths.forEach((t, k) => {
+          t.classList.remove("over");
+          const r = t.getBoundingClientRect();
+          if (k !== dg.i && e.clientX > r.left && e.clientX < r.right) {
+            dg.to = k;
+            t.classList.add("over");
+          }
+        });
+        const f = ths[0].getBoundingClientRect(),
+          l = ths[ths.length - 1].getBoundingClientRect();
+        if (e.clientX <= f.left) {
+          dg.to = 0;
+          ths[0].classList.add("over");
+        } else if (e.clientX >= l.right) {
+          dg.to = ths.length - 1;
+          ths[ths.length - 1].classList.add("over");
+        }
+      });
+      function endDrag(ok) {
+        if (!dg) return;
+        const g = dg;
+        dg = null;
+        if (g.on) {
+          dragged = true;
+          setTimeout(() => {
+            dragged = false;
+          }, 50);
+          if (ok && g.to !== g.i) {
+            const [a] = S.apps.splice(g.i, 1);
+            S.apps.splice(g.to, 0, a);
+            save();
+          }
+          render();
+        }
+      }
+      window.addEventListener("pointerup", () => endDrag(true));
+      window.addEventListener("pointercancel", () => endDrag(false));
+
+      // ===== Đồng bộ Firebase (chỉ chạy khi FIREBASE_CONFIG đã được dán) =====
+      let FB = null,
+        uid = null,
+        unsubs = [],
+        pushTimer = null,
+        ready = false;
+      const RM = new Map(),
+        enc = encodeURIComponent,
+        ser = (o) => JSON.stringify(o, Object.keys(o).sort());
+      function setSyncMsg(t) {
+        const e = document.getElementById("sm");
+        if (e) e.textContent = t;
+      }
+      // Mô hình Firestore: users/{uid}/apps/{tên}, users/{uid}/mails/{email}, users/{uid}/checks/{email|app} (chỉ lưu ô đang tick)
+      function want() {
+        const m = new Map(),
+          ap = {};
+        S.apps.forEach((a, i) => {
+          ap[a.name] = dueOf(a);
+          m.set("apps/" + enc(a.name), {
+            name: a.name,
+            times: a.times,
+            order: i,
+          });
+        });
+        S.mails.forEach((x, i) =>
+          m.set("mails/" + enc(x), { email: x, order: i }),
+        );
+        for (const k in S.checks) {
+          const [mail, app] = k.split("||");
+          if (
+            ap[app] !== undefined &&
+            S.mails.includes(mail) &&
+            S.checks[k] >= ap[app]
+          )
+            m.set("checks/" + enc(mail) + "|" + enc(app), {
+              mail,
+              app,
+              at: S.checks[k],
+            });
+        }
+        return m;
+      }
+      async function doPush() {
+        pushTimer = null;
+        const w = want(),
+          ops = [];
+        w.forEach((d, k) => {
+          const j = ser(d);
+          if (RM.get(k) !== j) {
+            ops.push([k, d]);
+            RM.set(k, j);
+          }
+        });
+        [...RM.keys()].forEach((k) => {
+          if (!w.has(k)) {
+            ops.push([k]);
+            RM.delete(k);
+          }
+        });
+        const { writeBatch, doc } = FB.Fs;
+        for (let i = 0; i < ops.length; i += 400) {
+          const b = writeBatch(FB.db);
+          ops.slice(i, i + 400).forEach(([k, d]) => {
+            const r = doc(FB.db, "users", uid, ...k.split("/"));
+            d ? b.set(r, d) : b.delete(r);
+          });
+          try {
+            await b.commit();
+          } catch (e) {
+            setSyncMsg("Lỗi lưu: " + e.code);
+          }
+        }
+      }
+      function fromRM() {
+        const w = want();
+        if (
+          w.size === RM.size &&
+          [...w].every(([k, d]) => RM.get(k) === ser(d))
+        )
+          return;
+        const ap = [],
+          ml = [],
+          ck = {};
+        RM.forEach((j, k) => {
+          const d = JSON.parse(j),
+            c = k.split("/")[0];
+          if (c === "apps") ap.push(d);
+          else if (c === "mails") ml.push(d);
+          else ck[d.mail + "||" + d.app] = d.at;
+        });
+        ap.sort((a, b) => a.order - b.order);
+        ml.sort((a, b) => a.order - b.order);
+        S.apps = ap.map((d) => ({ name: d.name, times: d.times, last: 0 }));
+        S.mails = ml.map((d) => d.email);
+        S.checks = ck;
+        try {
+          localStorage.setItem("cat_data", JSON.stringify(S));
+        } catch (e) {}
+        render();
+        reset();
+      }
+      function push() {
+        if (!FB || !uid || !ready) return;
+        clearTimeout(pushTimer);
+        pushTimer = setTimeout(doPush, 300);
+      }
+      function drawSync(u) {
+        const el = document.getElementById("sync");
+        el.hidden = false;
+        el.innerHTML = u
+          ? `<span>☁️ Đã đồng bộ · ${esc(u.email || "")}</span><button class="ghost" id="so">Đăng xuất</button><span id="sm"></span>`
+          : `<span>☁️ Chưa đăng nhập, dữ liệu chỉ lưu trên máy này</span><button class="ghost" id="si">Đăng nhập Google</button><span id="sm"></span>`;
+        const bi = document.getElementById("si"),
+          bo = document.getElementById("so");
+        if (bi)
+          bi.onclick = () =>
+            FB.Au.signInWithPopup(
+              FB.auth,
+              new FB.Au.GoogleAuthProvider(),
+            ).catch((e) => setSyncMsg("Đăng nhập lỗi: " + e.code));
+        if (bo) bo.onclick = () => FB.Au.signOut(FB.auth);
+      }
+      async function initSync() {
+        if (!FIREBASE_CONFIG) return;
+        const el = document.getElementById("sync");
+        el.hidden = false;
+        el.textContent = "☁️ Đang kết nối đồng bộ…";
+        try {
+          const B = "https://www.gstatic.com/firebasejs/10.12.2/";
+          const [A, Au, Fs] = await Promise.all([
+            import(B + "firebase-app.js"),
+            import(B + "firebase-auth.js"),
+            import(B + "firebase-firestore.js"),
+          ]);
+          const app = A.initializeApp(FIREBASE_CONFIG),
+            auth = Au.getAuth(app),
+            db = Fs.getFirestore(app);
+          FB = { Au, Fs, auth, db };
+          Au.onAuthStateChanged(auth, (u) => {
+            unsubs.forEach((f) => f());
+            unsubs = [];
+            ready = false;
+            RM.clear();
+            uid = u ? u.uid : null;
+            drawSync(u);
+            if (!u) return;
+            const first = {};
+            ["apps", "mails", "checks"].forEach((name) => {
+              unsubs.push(
+                Fs.onSnapshot(
+                  Fs.collection(db, "users", u.uid, name),
+                  (snap) => {
+                    [...RM.keys()].forEach((k) => {
+                      if (k.startsWith(name + "/")) RM.delete(k);
+                    });
+                    snap.forEach((d) =>
+                      RM.set(name + "/" + d.id, ser(d.data())),
+                    );
+                    first[name] = true;
+                    if (!ready) {
+                      if (first.apps && first.mails && first.checks) {
+                        ready = true;
+                        if (
+                          [...RM.keys()].some((k) => !k.startsWith("checks/"))
+                        )
+                          fromRM();
+                        else doPush();
+                      }
+                      return;
+                    }
+                    if (!pushTimer) fromRM();
+                  },
+                  (err) => setSyncMsg("Lỗi đồng bộ: " + err.code),
+                ),
+              );
+            });
+          });
+        } catch (e) {
+          el.textContent =
+            "☁️ Không kết nối được đồng bộ, đang dùng dữ liệu trên máy";
+          console.error(e);
+        }
+      }
+      initSync();
+      applyPal();
+      render();
+      reset();
+      setInterval(reset, 30000);
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) reset();
+      });
+    </script>
+  </body>
 </html>
